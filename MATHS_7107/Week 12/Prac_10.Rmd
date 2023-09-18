@@ -1,0 +1,155 @@
+---
+title: "Prac_10"
+author: "Chang Dong"
+date: "2023-04-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+pacman::p_load(tidyverse,vip,ranger)
+heart  <- read.csv("Heart.csv" ) # Loads the dataset for us
+heart
+```
+
+```{r}
+heart  <- heart %>%  
+  select( -1 ) %>% # The first column is useless
+  mutate_if( is_character, factor ) # Changes character variables to factors
+heart 
+
+```
+
+```{r}
+heart %>% 
+  skim()
+```
+
+```{r}
+heart <- heart %>% 
+  mutate( Sex = as.factor( Sex ) ) %>% 
+  drop_na()
+
+heart %>% 
+  skim()
+```
+
+```{r}
+class_tree_spec <- decision_tree( mode = "classification" ) %>% 
+  set_engine( "rpart" )
+```
+
+```{r}
+set.seed( 1210 ) # Let's not forget that seed
+# Let's make sure we have even proportions of AHD = Yes and AHD = No with the use of strata.
+heart_split <- initial_split( heart, strata = AHD ) 
+heart_train <- training( heart_split )
+heart_test <- testing( heart_split )
+```
+
+```{r}
+set.seed( 1012 )
+heart_cv <- vfold_cv( heart_train, v = 5, strata = AHD )
+```
+
+```{r}
+heart_tree <- class_tree_spec %>% 
+  fit( AHD ~ . , data = heart_train ) 
+```
+
+```{r}
+heart_tree
+plot( heart_tree$fit )
+text( heart_tree$fit, pretty = 0 )
+```
+
+```{r}
+heart_resamples <- fit_resamples( object = class_tree_spec,
+                                  preprocessor = recipe(AHD ~ ., data = heart_train),
+                                  resamples = heart_cv )
+ heart_resamples %>% 
+    collect_metrics()
+```
+
+```{r}
+heart_tree %>% 
+  vip( num_features = 10 ) + # Only 10 predictors are considered important
+  theme_minimal()
+```
+
+```{r}
+heart_preds <- heart_tree %>% 
+  predict( new_data = heart_test, type = "class" ) %>% # We get class predictions
+  bind_cols( heart_test %>% 
+               select( AHD ) ) # We add the truth
+heart_preds
+```
+
+```{r}
+heart_preds %>% 
+  conf_mat( truth = AHD, estimate = .pred_class)
+```
+
+```{r}
+heart_preds <- heart_preds %>% 
+  bind_cols( predict( heart_tree, 
+                      new_data = heart_test, 
+                      type = "prob" ) )
+heart_preds
+
+```
+
+
+```{r}
+set.seed( 1234 )
+hitters_cv <- vfold_cv( hitters_train, v = 10 )
+```
+
+
+```{r}
+rf_spec <- rand_forest( mode = "regression", trees = 1000, mtry = 5 ) %>% 
+  set_engine( "ranger" )
+```
+
+```{r}
+set.seed( 2345 )
+hitters_rf <- rf_spec %>% 
+  fit( Salary ~ ., data = hitters_train )
+hitters_rf
+```
+
+```{r}
+dt_cv <- fit_resamples( object = reg_tree_spec,                         
+                        preprocessor = recipe(Salary ~., data = hitters_train),
+                        resamples = hitters_cv )
+dt_cv %>% 
+  collect_metrics()
+```
+
+```{r}
+set.seed( 1010 ) # Remember that we should set seeds with random forests. 
+rf_cv <- fit_resamples( object = rf_spec, 
+                        preprocessor = recipe(Salary ~., data = hitters_train),
+                        resamples = hitters_cv ) 
+rf_cv %>% 
+  collect_metrics()
+```
+
+```{r}
+hitters_preds <- hitters_rf %>% 
+  predict( new_data = hitters_test ) %>% 
+  bind_cols( hitters_test %>% 
+               select( Salary ) ) # Add on the truth
+hitters_preds
+
+```
+
+```{r}
+hitters_preds %>% 
+  metrics( truth = Salary, estimate = .pred )
+```

@@ -1,0 +1,299 @@
+---
+title: "MATHS 7107 Data Taming Assignment Four Questions"
+author: "Chang Dong"
+date: "2023-03-21"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Summary
+
+The Melbourne Water Corporation (MWC) manages the water supply in Melbourne, and there is a need for MWC to build a model to help predict the evaporation at the reservoirs. In this paper, we mainly focus on this problem to build a model. there are 3 main parts to this paper. Firstly, we introduced the Method, which includes the data set introduction, Exploratory Data Analysis, Model selection, and diagnostics. Then in the result section, we interpreted the details of the final model. Finally, we give the prediction result of new data using the final model to predict a 95% probability of evaporation exceeding 10 mm or below 10 mm. And discussed the pros and cons of the model. 
+
+## Method Section
+
+### Bivariate summaries
+
+In this section, we mainly focused on exploratory data analysis, which including data cleaning, dataset investigation, and visulization to check relationships between Evaporation and other 5 features.
+
+Data Cleaning: Firstly, the data set was loaded and then just 5 attributes were choosen, which are "Date","Maximum.Temperature..Deg.C.", "Minimum.temperature..Deg.C.","X9am.relative.humidity....","Evaporation..mm.". The dataset name is MWC_df. Next, we extract months and the day of week from date attribute. And the date attribute was not contained in this dataset. Then the 6 attributes were recoded as "month", "wday","maxtemp","mintemp","humidity","Evaporation". Next, we found month and wday are categorical data, while others are numerical. So these categorical data were retyped as factor. Finaly, we found and removed 8 missing values in Evaporation column.
+
+Data Analysis: The relationship between Evaporation and other 5 attributes was visulized which can be seen in appendix below. 
+1) Evaporation \~ month. From fig1 we can find that month obviously influence the evaporation level. The evaporation is at the lowest average value in the Month of Jun, which is around 2mm. And as the month gets far away from June in the year, the average value of evaporation roughly gets bigger and bigger. The largest average value was achieved in Jan, which is around 8mm. 
+2) Evaporation \~ wday. From fig2 we can roughly see that the average evaporation value is similar as for different weekdays, which is around 4mm, and evaporation shows almost the same distribution on different weekdays. So there seems no obvious relationship between them. 
+3) Evaporation \~ Maximum temperature. From fig3 we can see that there seems a positive relationship between Maximum temperature and Evaporation. 
+4) Evaporation \~ Minimum temperature.From fig4 we can see that there seems a positive relationship between Minimum temperature and Evaporation. 
+5) Evaporation \~ humidity. From fig5 we can see that there seems a negative relationship between relative humidity at 9am and Evaporation.
+
+In summary, we can conclude that all the features except wday has some relationship with Evaporation.
+
+### Model selection
+
+In this section, we build 3 models(lm1,lm2,lm3) to predict evaporation, using all of the predictors listed in the Bivariable summaries paragraph above. And all the latter models reduced one attribute compared with the former one. The reduction process followed by reducing the most insignificant attribute of that model, the significance was measured by a statistical value, p-value, and it shows less likely to influence the evaporation for the attribute with the big p-value. As for the numerical data maxtemp, mintemp and humidity, we use summary function to determine their significance, while for the rest of catergorical data, we use anova instead.
+
+Round 1: we build lm1 using all the above five attributes and 1 interaction term of month and humidity, which shows the co-influence of them. From the summary and anova result, we can see the most insignificant attribute is maxtemp, whoes p-value is around 0.561, so we remove it in the first round then use the rest 5 attributes to build lm2.
+
+Round 2: we build lm2 based on lm1, the only difference is we removed maxtemp. From the summary and anova result, we can see the most insignificant attribute is wday, whose p-value is around 0.102, so we remove it in the second round.
+
+Round 3: we build lm3 based on lm2, the only difference is we removed wday. From the summary and ANOVA result, all the numerical attributes show considerable statistical significance whose p-value is less than 0.05, and the same as categorical attribues.
+
+So the final model after 3 rounds of selection is lm3. We use month, mintemp, humidity, and the interaction of humidity and month to predict evaporation. As we mentioned, all the terms show considerable statistical significance whose p-value is less than 0.05. it has one difference that we conclude from the Bivariate summaries, which is maxtemp shows a positive influence on evaporation while the model tells us it has a very weak statistical significance, the possibility that we can reject them have a linear relationship is around 0.561. And the rest of the terms shows strong significance while wdays show week significance as we expected. The reason for the difference is maxtemp and mintemp show a similar influence on evaporation that we drew from Bivariate summaries, so mintemp can have a good explanation for it that maxtemp shows a weak significance, the correration(0.701) of mintemp and maxtemp reveal that they all belongs to temeprature, and temperature have influence to evaporation.
+
+## Result Section
+
+### Model interpretation
+
+Let's interpret the model lm3 that we finally obtained.
+
+$$
+Evaporation = month \ + \ mintemp\ + \ humidity\ + humidity:month
+$$
+
+According the our Appendix round3 summary result, we can see that Jan is the reference month is January, which is 8.589 mm in the condition of mintemp, humidity = 0. and other estimate terms of mintemp and humidity indicate the coefficient between the term and evaporation, which is 0.369 and -0.010 respectively. The other month's estimate indicate that the interception increment compared with the reference month. And the intersection term of each month indicate the evaporation increment in that month with 1 unit increment of humidity.
+
+## Discussion Section
+
+### Prediction
+
+In this part, we will use the lm3 model to predict the following new data. The details were shown in Table 1. Applying our model lm3, we get the predictions of our new data with best-fit value and prediction interval of 95% level including upper bound and lower bound. The output was arranged in Table 2.From our result, the day of "2020-01-13" get a highest prediction value of evaporation which is around 14.872 mm, on the contrast of the lowest value at the day of "2020-07-06" which is 2.265.
+
+Now we have two events. Event 1 is there is 95% conﬁdence that more than 10mm of evaporation will occur. Event 2 is there is 95% conﬁdence that more than 10mm of evaporation will not occur. We need to use one-tail prediction interval to obtain our result. The one-tailed 95% prediction interval estimates the evaporation boundary with 95% prediction either above or below the bound in this case, not within a range. The result was show in Table 3. From Table 3 we can see, only the day of "2020-01-13" can satisfy event 1, because the lower bound of the one-tail prediction interval(0.05,1) is 13.114 mm (\>10 mm), while the other not. Meanwhile, the day of "2020-02-29", "2020-07-06" and "2020-12-25" can all satisfy event 2, because the upper bound of one-tail prediction interval(0,0.95) are all less than 10 mm, while the day of "2020-01-13" not.
+
+### pros and cons
+
+#### pros
+
+1.   Linear model has a good explainability, we can directly get how much of the influence of each factor.
+2.   Our data basically obey the linear model assumptions, so we can have a more credible trust in this model
+
+#### cons
+
+1.  As we can see our prediction interval in some cases occurs at a negative value, this is inconsistence with our physical world.
+2.  There are other potential influences to evaporation, so we can not get a precise prediction of our evaporation.
+
+## Conclusion
+In this paper, we build a linear model to predict evaporation at Cardinia Reservoir based on Melbourne's day-to-day weather observations. This paper outlines the factors that can have a significant influence on evaporation and demonstrates the ability to make predictions for each individual day. We also give prediction intervals to help forecast if the event of evaporation of more than 10 mm will happen or not on a specific day, Only the date "2020-01-13" shows more than 95% confidence to have more than 10 mm evaporation, and the rest of date shows 95% confidence to have less than 10 mm evaporation. Besides, we have noticed that it will have a relatively big evaporation value in around January with low humidity and high temperature. In conclusion, this model can well explain the impact of each factor on evaporation, and basically obeys the linear assumption, but there are still some drawbacks that need to think in our future work.
+
+## Appendix
+
+### Load all necessary pkgs
+
+```{r}
+pacman::p_load(tidyverse,lubridate)
+```
+
+### EDA(Exploratory Data Analysis)
+
+#### Load, Select and Recode data
+
+```{r}
+MWC <- read.csv("melbourne.csv")
+MWC_df <- MWC[c(1,2,3,11,5)]
+MWC_df["month"] = lapply(MWC_df[1], month)
+MWC_df["wday"] =lapply(MWC_df[1], wday)
+MWC_df <- MWC_df[c("month","wday","Maximum.Temperature..Deg.C.",
+                   "Minimum.temperature..Deg.C.",
+                   "X9am.relative.humidity....","Evaporation..mm.")]
+colnames(MWC_df) <- c("month", "wday","maxtemp",
+                      "mintemp","humidity","Evaporation")
+MWC_df %>% str()
+MWC_df$month <- as.factor(MWC_df$month)
+MWC_df$wday <- as.factor(MWC_df$wday)
+MWC_df %>% head()
+```
+
+#### Remove missing value
+
+```{r}
+MWC_df %>% is.na() %>% colSums()
+MWC_df <- MWC_df %>% na.omit()
+MWC_df %>% is.na() %>% colSums()
+```
+
+#### 1. Evaporation(mm) vs Month
+
+```{r}
+ggplot(data = MWC_df, aes(x = month, y = Evaporation, fill = month)) +
+  geom_boxplot() +
+  ggtitle("fig1. Evaporation(mm) vs Month") +
+  ylab("Evaporation (mm)") +
+  xlab("Month")
+```
+
+#### 2. Evaporation(mm) vs Day of the week
+
+```{r}
+ggplot(data = MWC_df, aes(x = wday, y = Evaporation, fill = wday)) +
+  geom_boxplot() +
+  ggtitle("fig2. Evaporation(mm) vs Day of the week") +
+  ylab("Evaporation (mm)") +
+  xlab("Day of the week")
+```
+
+#### 3. Evaporation(mm) vs Maximum temperature in degrees Celsius
+
+```{r}
+ggplot(data = MWC_df, aes(x = maxtemp, y = Evaporation)) +
+  geom_point() + geom_smooth()+
+  ggtitle("fig3. Evaporation(mm) vs Maximum temperature in degrees Celsius")+
+  ylab("Evaporation (mm)")+
+  xlab("Maximum temperature(°C)")
+```
+
+#### 4. Evaporation(mm) vs Mnimum temperature in degrees Celsius
+
+```{r}
+ggplot(data = MWC_df, aes(x = mintemp, y = Evaporation)) +
+  geom_point() + geom_smooth()+
+  ggtitle("fig4. Evaporation(mm) vs Minimum temperature in degrees Celsius")+
+  ylab("Evaporation (mm)")+
+  xlab("Minimum temperature(°C)")
+```
+
+#### 5. Evaporation(mm) vs Relative humidity at 9am.
+
+```{r}
+ggplot(data = MWC_df, aes(x = humidity, y = Evaporation)) +
+  geom_point() + geom_smooth()+
+  ggtitle("fig5. Evaporation(mm) vs Relative humidity at 9am")+
+  ylab("Evaporation (mm)")+
+  xlab("Relative humidity at 9am")
+```
+
+### Model Selection
+
+#### round1
+
+```{r}
+lm1 <- lm(Evaporation ~ month + wday+ mintemp + maxtemp +
+            humidity + humidity:month , data = MWC_df)
+summary(lm1)
+anova(lm1)
+```
+
+#### round2
+
+```{r}
+lm2 <- lm(Evaporation ~ month + wday+ mintemp + humidity +
+            humidity:month , data = MWC_df)
+summary(lm2)
+anova(lm2)
+```
+
+#### round3
+
+```{r}
+lm3 <- lm(Evaporation ~ month + mintemp + humidity  + 
+            humidity:month , data = MWC_df)
+summary(lm3)
+anova(lm3)
+```
+
+#### Explain the difference between model result and the visual analysis
+
+```{r}
+cor(x = MWC_df$maxtemp,MWC_df$mintemp)
+```
+
+### Model diagnostics
+
+In this part, we will test all of the assumptions of my linear model lm3(the final model). 1) Linearity;2) Homoscedasticity; 3) Normality; 4) Independence
+
+1)  The Assumption 1 Linearity was shown in fig6. The x-axis is Fitted values which is the evaporation prediction using our model, and the y-axis, residuals refer to the error between our prediction and ground true value. From the graph, we can see that the residuals are roughly evenly distributed near 0, corresponding with the red trend line that is almost straight and near 0 with a slightly upwards bent at the end). And only a small number of points are located far away from the red line. So we can justify that the assumption 1 is basically true.
+
+2)  The Assumption 2 Homoscedasticity was shown in fig7. The x-axis is Fitted values which is the evaporation prediction using our model, and the y-axis, the root squared of standardized residuals, the transformation of error that we only care about the standardized absolute distance between y_pred and y_ture, that we can check whether these errors are same in different prediction values. From fig7 we can see that the error level has a small upwards trend as predictions rise up(the red line). But as our experience, that trend is acceptable for a linear model. This assumption is roughly established.
+
+3)  The Assumption 3 Normality was shown in fig8. The x-axis is the theoretical quantile, and the y-axis is the standardized residuals which is what we observed. If these transformed errors follow the same quantile as the theoretical quantile(normally distributed), which is these points lie in the line y=x , we can justify our observations obey the assumption of normality. From the graph we can see, within 1.5 quantiles, the assumption is perfectly established, while apart from this range, these points are spread around and even far away. But it is also acceptable, most of the values follow the theoretical distribution. So we can justify that assumption 3 is roughly true.
+
+4)  The Assumption 4 Independence. Typically in a time series model, this assumption can not be established, because day 1 usually has an influence on a continuous day. the error do not independent means our observations are not independent, so this assumption is not justified.
+
+#### fig6. Check Assumption 1: Linearity
+
+```{r}
+plot(lm3, which =1,
+     sub = "fig6. Check Assumption 1: Linearity")
+```
+
+#### fig7. Check Assumption 2: Homoscedasticity
+
+```{r}
+plot(lm3, which =3, 
+     sub = "fig7. Check Assumption 2: Homoscedasticity")
+```
+
+#### fig8. Check Assumption 2: Normality
+
+```{r}
+plot(lm3, which =2,
+     sub = "fig8. Check Assumption 2: Normality")
+```
+
+
+
+### Prediction Result
+
+#### Table 1: The newdata infomration
+
+```{r}
+date <- c(ymd("2020-02-29"), ymd("2020-12-25"),
+          ymd("2020-01-13"), ymd("2020-07-06"))
+
+newdata <- tibble(
+  date = date,
+  month = as.factor(month(date)),
+  wday = as.factor(wday(date)),
+  maxtemp = c(23.2, 31.9, 44.3, 10.6),
+  mintemp = c(13.8, 16.4, 26.5, 6.8),
+  humidity = c(74, 57, 35, 76)
+)
+
+newdata %>% arrange(date)
+```
+
+#### Table 2: Prediction of newdata using lm3
+
+```{r}
+Evaporation_pred <- round(predict(lm3, newdata[,2:6], 
+                                  interval = "prediction",
+                                  level = 0.95),3)
+
+result_df <- data.frame(date = date, 
+                        Evaporation_pred = Evaporation_pred)
+result_df %>% arrange(date)
+
+```
+
+#### Table 3: One-tailed prediction interval
+
+```{r}
+
+predictions <- predict(lm3, newdata, se.fit = TRUE)
+
+alpha_1 <- 0.05
+z_1 <- qnorm(1 - alpha_1)
+uppr_0.95 <- round(predictions$fit + 
+                     z_1 * predictions$se.fit,3)
+
+
+alpha_2 <- 0.95
+z_2 <- qnorm(1 - alpha_2)
+lwr_0.05 <- round(predictions$fit + 
+                    z_2 * predictions$se.fit,3)
+
+predictions_df <- data.frame(
+  index <- date,
+  uppr_0.95 = uppr_0.95,
+  lwr_0.05 = lwr_0.05
+)
+
+predictions_df %>% arrange(date) 
+
+
+```

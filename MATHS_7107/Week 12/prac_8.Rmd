@@ -1,0 +1,75 @@
+---
+title: "practical"
+author: "Chang Dong"
+date: "2023-04-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{R}
+pacman::p_load(tidymodels,dataset)
+data(Titanic)
+LR_spec <- logistic_reg( mode = "classification" )
+```
+
+```{r}
+titanic <- as.data.frame(Titanic)
+titanic
+```
+
+```{r}
+Titanic_LR <- LR_spec %>%   
+  set_engine( "glm" ) %>%   
+  fit( Survived ~ Age + Sex, data = titanic )
+```
+
+```{r}
+Titanic_LR
+```
+
+```{r}
+titanic_cv <- vfold_cv( 
+ data = titanic, 
+ v = 5, 
+ strata = Survived )
+```
+
+```{r}
+titanic_cv %>% 
+ slice( 1 ) %>% #This grabs only the first row
+ pull( splits ) %>% 
+ map_df( training ) #If you are unfamiliar with map, have a look at the help file. What is it doing?
+ 
+```
+
+```{r}
+titanic_cv %>% 
+ slice( 1 ) %>% #This grabs only the first row
+ pull( splits ) %>% 
+ map_df( testing ) 
+```
+
+
+```{r}
+lr_spec <- logistic_reg( mode = "classification" ) %>% 
+   set_engine("glm")
+
+titanic_resamples <- fit_resamples(  
+ object = lr_spec,
+ preprocessor = recipe(Survived ~ Age + Sex + Class,data=titanic),
+ resamples = titanic_cv, 
+ control = control_resamples( save_pred = T )
+)
+titanic_resamples 
+
+```
+
+```{r}
+titanic_resamples %>% 
+  collect_metrics()
+```

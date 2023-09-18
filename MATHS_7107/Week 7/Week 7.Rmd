@@ -1,0 +1,191 @@
+---
+title: "MATHS 7107 Data Taming Tutorial Solutions"
+author: "Chang Dong"
+date: "2023-03-17"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Multiple Regression
+
+## Load the data
+First, let’s make sure the tidyverse package is loaded and we’ll look at the population data again this week.
+
+## Outline
+
+This week we’re putting together a lot of what we have done so far.
+
+Our exercise this week will be selecting an appropriate model to predict annual population growth in the population data. To limit things a little, we will not consider interaction terms and the only predictors we will consider are:
+
+1. med_age_all - the median age of all residents.
+
+2. med_age_male - the median age of male residents.
+
+3. med_age_female - the median age of female residents.
+
+4. ed_index_2015 - the United Nations index of educational development, as at 2015.
+
+5. continent - the continent the country is in.
+
+6. inequality - the GINI coefficient measuring income inequality in the country.
+
+7. per_urban - the percentage of the population living in urban centres.
+
+Using these predictors (. . . or not), we want to find the best model to predict annual population growth. We can do this in a step-by-step process by choosing which predictors are significant. You can do this in one of two ways:
+
+1. Start with an empty model, and try all possible predictors alone. Add the predictor with the smallest p-value. Using this model, try all possible remaining predictors, adding the predictor with the smallest p-value. Continue until there are no remaining significant predictors to possibly add.
+
+2. Start with a ‘full’ model, with all possible predictors. Remove the predictor with the highest p-value.
+
+Fit the model without this predictor. Remove the predictor with the highest p-value. Continue until all predictors left in the model are significant. Today we will use method number 2.
+
+## Visualise the data
+
+### Produce the appropriate plots to compare each predictor variable with the response variable. Consider the relationship in each plot.
+```{r}
+pacman::p_load("tidyverse")
+population <- read.csv("population.csv")
+ggplot(population, aes(y = pop_growth_2015_20, x = med_age_all)) + geom_point()
+```
+There appears to be a moderate, negative, linear relationship between the median age of all residents and population growth.
+
+```{r}
+ggplot(population, aes(y = pop_growth_2015_20, x = med_age_male)) + geom_point()
+```
+
+There appears to be a moderate, negative, linear relationship between the median age of male residents and population growth.
+
+```{r}
+ggplot(population, aes(y = pop_growth_2015_20, x = med_age_female)) + geom_point()
+```
+
+There appears to be a moderate, negative, linear relationship between the median age of female residents and population growth.
+
+```{r}
+ggplot(population, aes(y = pop_growth_2015_20, x = ed_index_2015)) + geom_point()
+```
+
+There appears to be a moderate, negative, linear relationship between the United Nations index of educational development (as at 2015) and population growth.
+
+```{r}
+ggplot(population, aes(y = pop_growth_2015_20, x = continent)) + geom_boxplot()
+```
+
+Africa has the highest median population growth whilst Europe has the lowest. Oceania has the largest variability (IQR) in population growth whilst South America has the smallest. There are outliers in both Africa and Asia.
+
+```{r}
+ggplot(population, aes(y = pop_growth_2015_20, x = inequality)) + geom_point()
+```
+
+There appears to be no relationship between the GINI coefficient measuring incomme inequality in the country and population growth.
+
+```{r}
+ggplot(population, aes(y = pop_growth_2015_20, x = per_urban)) + geom_point()
+```
+
+There appears to be no relationship between the percentage of the population living in urban centres and population growth.
+
+## ‘Backwards’ model selection
+
+First, let’s start by building the full linear model.
+
+Then you will need to look at the p-values. Remember the p-value for the categorical variable continent will be given by an ANOVA (using the anova() function), while the other p- values will be given by the model’s summary (using the summary() function):
+
+```{r}
+lm_pop <- lm(pop_growth_2015_20 ~ med_age_all +
+               med_age_male + 
+               med_age_female +
+               ed_index_2015 + 
+               inequality + 
+               per_urban + 
+               continent , 
+               data = population) 
+summary(lm_pop)
+```
+
+```{r}
+anova(lm_pop)
+```
+
+### Consider the p-values. Can any of the predictor variables be removed? If so, which one? Remove it.
+
+### Repeat this process until all variables in your model are significant.
+
+So our p-value for continent is 0.000116, while our p-values for the quantitative variables are:
+
+• 0.895 for med_age_all,
+
+• 0.321 for med_age_male,
+
+• 0.044 for med_age_female,
+
+• 0.376 for ed_index_2015,
+
+• 0.006 for inequality, and
+
+9 • 0.006 for per_urban.
+
+So med_age_all is not significant, after the other variables are considered. That makes sense, since the overall median age is going to be pretty covered by the median age of men and of women - we probably don’t need all three.
+
+Let’s have a look at a model without it:
+
+```{r}
+lm_pop <- lm(pop_growth_2015_20 ~ med_age_male + 
+               med_age_female + 
+               ed_index_2015 + 
+               inequality + 
+               per_urban + 
+               continent , 
+               data = population) 
+summary(lm_pop)
+```
+
+```{r}
+anova(lm_pop)
+```
+
+Here, ed_index_2015 has the highest p-value, of 0.364, which is not significant. That’s really interesting, one might’ve though education has an impact on population growth, but it looks here that it doesn’t, once we account for median ages, levels of economic inequality, urbanisation and the continent.
+
+Let’s remove it.
+```{r}
+lm_pop <- lm(pop_growth_2015_20 ~ med_age_male + 
+               med_age_female +
+               inequality + 
+               per_urban +
+               continent ,
+               data = population)
+summary(lm_pop)
+```
+
+```{r}
+anova(lm_pop)
+```
+
+How could we do this in R?
+
+### First create a tibble with our new data.
+```{r}
+new_country = tibble( med_age_male = 38, med_age_female = 41, inequality = 28, per_urban = 90, continent = "Europe" )
+```
+
+Since we’re interested in a particular country, rather than the average country of this character, we should make a prediction interval. This is because:
+
+• A confidence interval is for an average country of this character
+
+• A point prediction doesn’t consider how accurate our prediction is, and it’s important to know how we might be wrong.
+
+### Using R, calculate the prediction interval based on the above information. Interpret this interval in context.
+
+```{r}
+predict(lm_pop, new_country, interval = "prediction")
+```
+So we are 95% confident that annual population growth between 2015 and 2020 will be between -0.282% and 1.175% for this country.
+
+### Are there any negative numbers in the interval? If yes, are they reasonable?
+
+Often when we see negative numbers in projections we should ask ourselves if the value is reasonable. For example, it would be unreasonable if -0.282% of the population lived in urban centres. But in this case it’s perfectly reasonable for population growth to be negative, if the population is decreasing.

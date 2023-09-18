@@ -1,0 +1,261 @@
+---
+title: "MATHS 7107 Data Taming"
+author: "Chang Dong"
+date: "2023-03-31"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Part 1
+
+First we will start by looking at how to measure a model using yardstick. We will fit a regression model, and also a classification model to the penguins dataset and then have a look at assessing them.
+
+## Load the data and required packages
+```{r}
+pacman::p_load(tidyverse, tidymodels,palmerpenguins,harrypotter)
+
+data("penguins", package = "palmerpenguins")
+```
+
+## Create the models
+```{r}
+penguin_M1 <- workflow() %>% 
+  add_formula(flipper_length_mm ~ body_mass_g) %>% 
+  add_model( linear_reg() %>% set_engine("lm") ) %>% 
+  fit(penguins) 
+penguin_M1
+```
+
+```{r}
+penguin_M2 <- workflow() %>% 
+  add_formula(sex ~ body_mass_g) %>% 
+  add_model(
+    logistic_reg() %>% 
+      set_engine("glm")
+  ) %>%
+  fit(penguins) 
+penguin_M2
+```
+
+#### Question: For model 1, what are the response variable and the predictors.
+```{r}
+# The response variable is flipper length and the predictor is body mass.
+```
+
+#### Question: For model 2, what are the response variable and the predictors.
+```{r}
+# The response variable is sex and the predictor is body mass.
+```
+
+## Getting prediction
+
+For yardstick, we will need predicted values, we obtain that using the predict() function. Here I will add a variety of predictions to the original dataset.
+```{r}
+penguins_pred <- penguins %>% 
+  bind_cols( predict(penguin_M1, penguins), 
+             predict(penguin_M2, penguins), 
+             predict(penguin_M2, penguins,type = "prob"),
+            ) %>% 
+  select(sex, flipper_length_mm,starts_with(".pred")) 
+penguins_pred
+```
+
+
+#### Question: What is the predicted flipper length for the first penguin? 
+```{r}
+# The predicted flipper length is 194mm
+```
+
+####Question: What is the predicted probability of being male for the first penguin? 
+```{r}
+# The predicted prob is 0.374.
+```
+
+### Categorical metrics
+
+For most of the metrics, we will use the hard classification for the categorical variable as given by .pred_class. We can get the confusion matrix:
+
+```{R}
+penguins_pred %>% conf_mat( truth = sex, estimate = .pred_class )
+```
+
+#### Question: How many of the females, we incorrectly predicted as male?
+```{R}
+# 56 of the female penguins were incorrectly identified as male
+```
+
+We can get the sensitivity as follows: 
+```{R}
+penguins_pred %>% sens( truth = sex, estimate = .pred_class )
+```
+
+#### Question: What is the specificity?
+
+We can obtain a set of the metrics as follows:
+
+```{R}
+categorical_metrics <- metric_set(sens, spec, precision, recall) 
+penguins_pred %>% 
+  categorical_metrics( truth = sex, estimate = .pred_class )
+```
+
+```{R}
+# The specificity is 0.560
+```
+
+#### Question: What is the precision? 
+```{R}
+# The precision is 0.596
+```
+
+We can plot the ROC curve using ggplot2, or quickly using autoplot()
+```{R}
+penguins_pred %>% 
+  roc_curve( truth = sex, estimate = .pred_female ) %>% 
+  autoplot()
+```
+
+#### Question: What is the AUC for M2? 
+
+We can obtain this as follows: 
+```{r}
+penguins_pred %>% roc_auc( truth = sex, estimate = .pred_female )
+```
+
+```{R}
+# The AUC is 0.752
+```
+
+## Part 2
+
+Now we are going to show how to split your data into folds for cross-validation. We will use then use cross-validation to get a more accurate measure of how well our models fit.
+
+## Load and split the data
+
+Back to the penguins - why would you not?
+
+First we are going to split our dataset into a test data to save for the very end, and the training data. 
+```{r}
+set.seed(2021) 
+penguin_split <- initial_split(penguins) 
+penguin_split
+```
+
+```{r}
+penguins_train <- training(penguin_split) 
+penguins_test <- testing(penguin_split)
+```
+
+#### Question: How many penguins in the test dataset? 
+```{r}
+# There are 86 penguins in the test dataset.
+```
+
+Now we are going to split our training dataset into folds: 
+```{r}
+penguin_CV <- vfold_cv(penguins_train) 
+penguin_CV
+```
+
+#### Question: How many folds are produced?
+```{r}
+# In total there are 10 folds. This is the default.
+```
+
+### Fit models and get measures
+
+We will set up two workflows - one regression, and one classification. 
+For linear regression:
+```{r}
+linear_model <- linear_reg() %>% 
+  set_engine("lm")
+
+penguin_linear_workflow <- workflow() %>% 
+  add_model(linear_model) %>% 
+  add_formula(bill_length_mm ~ body_mass_g)
+```
+
+For logistic regression:
+```{R}
+
+logistic_model <- logistic_reg() %>% 
+  set_engine("glm")
+
+penguin_logistic_workflow <- workflow() %>% 
+  add_model(logistic_model) %>% 
+  add_formula(sex ~ body_mass_g)
+```
+
+The key function is fit_resamples. This function will take a workflow, and folds and preform multiple fits. It fits the model to the CV training dataset, and then fits the model to the test CV and grabs some metrics.
+```{r}
+penguin_linear_resamples <- fit_resamples( 
+  penguin_linear_workflow, 
+  resamples = penguin_CV ) 
+penguin_linear_resamples
+```
+
+
+If we want to keep the prediction values on the CV test set, then we use:
+```{r}
+control = control_resamples(save_pred = TRUE)
+```
+
+Here is an example with the logistic regression.
+```{r}
+penguin_logistic_resamples <- 
+  fit_resamples( penguin_logistic_workflow, 
+                 resamples = penguin_CV, 
+                 control = control_resamples(save_pred = TRUE)
+)
+```
+
+We can now get the metrics out. Unnest returns all of them, while collect_metrics gives us the average:
+```{r}
+penguin_linear_resamples %>% unnest(.metrics)
+```
+
+```{r}
+penguin_linear_resamples %>% collect_metrics()
+```
+
+#### Question: What is the RMSE for the first fold? 
+```{r}
+# The RMSE for the first fold is 4.41.
+```
+
+#### Question: What is the mean CV RMSE? # The mean CV RMSE is 4.30
+
+You can produce a plot for the logistic regression model as follows:
+```{r}
+penguin_logistic_resamples %>% 
+  collect_predictions() %>% 
+  group_by(id) %>% 
+  roc_curve(truth = sex, estimate = .pred_female) %>% 
+  autoplot() +
+  harrypotter::scale_color_hp("Ravenclaw", discrete = TRUE)
+```
+
+## Compare to test
+
+Finally, we can get the metrics for the test data we saved at the start using last_fit
+```{r}
+penguin_linear_workflow %>% 
+  last_fit(penguin_split) %>% 
+  collect_metrics()
+```
+
+```{r}
+penguin_logistic_workflow %>%
+  last_fit(penguin_split) %>%
+  collect_metrics()
+```
+
+#### Question What is the test AUC?
+```{r}
+0.771
+```

@@ -1,0 +1,237 @@
+---
+title: "Assignment 3"
+author: "Ning Ni"
+date: "2023-03-08"
+output: pdf_document
+out.width='50%'
+out.height='50%'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Question One: Reading and Cleaning  
+## (a) Recode the change_0413 variable so it represents the percentage change in circulation between 2004 and 2013 as an integer. This will require manipulating the strings in change_0413.  
+```{r}
+pacman::p_load(tidyverse,mplot,caret)
+```
+```{r}
+news <- as_tibble(read.csv("pulitzer.csv", na.strings = "NA"))
+head(news)
+summary(news)
+#count(news,change_0413)
+
+```
+```{r}
+news <- 
+  news %>% mutate(change_0413 = as.integer(str_extract(change_0413,"-?\\d+")))
+```
+## (b) Append a new variable to the tibble which contains the average of circ_2004 and circ_2013.
+```{r}
+news <- 
+  news %>% mutate(circ_aver = (circ_2004 + circ_2013)/2)
+head(news)
+```
+# Question Two: Univariate Summary and Transformation
+## (a) Describe the distribution of the variable representing average circulation, including shape, location, spread and outliers (Reminder: plots and summary statistics are useful here).
+```{r}
+news %>% 
+  ggplot(aes(circ_aver))+
+  geom_histogram(binwidth = 50000,col ="black",fill = "orange")+
+  ggtitle("Histogram of the average of circulation")+
+  labs(x = "The average of circulation of all newspapers", y = "Frequency of average circulation")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+summary(news$circ_aver)
+sum <- summary(news$circ_aver)
+sum1 <- summary(news$change_0413)
+# Calculate the upper limit for outliers using the IQR method
+Q1 <- sum[[2]]
+Q3 <- sum[[5]]
+IQR <- Q3 - Q1
+outliers_threshold <- Q3 + 1.5*IQR
+outliers_threshold 
+
+# create boxplot of scores 
+news %>% 
+  ggplot(aes(y = circ_aver,x = NA,fill = 'red'))+
+  geom_boxplot()+
+  guides(fill = FALSE)+
+  labs(x = "Boxplot",y = "The average of circulation")+
+  ggtitle("Boxplot of average of circulation")+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+Shape: unimodal and right-skewed.
+Location: the median 333083 (see summary and box plot).
+Spread: the first quantile is 216013.000 and the third quantile is 462153.000, the interquartile range can be directly shown in the box plot.
+Outliers: outlier_threshold = 831362.500. There are 3 outliers above the outlier_threshold.
+## (b) Describe the distribution of change_0413, including shape, location, spread and outliers.
+```{r}
+news %>% 
+  ggplot(aes(change_0413))+
+  geom_histogram(binwidth = 5,col ="black",fill = "orange")+
+  ggtitle("Histogram of change_0413")+
+  labs(x = "percentage of change_0413", y = "Frequency of the range of change_0413")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+summary(news$change_0413)
+sum <- summary(news$change_0413)
+# Calculate the upper limit for outliers using the IQR method
+Q1 <- sum[[2]]
+Q3 <- sum[[5]]
+median <- sum[[3]]
+outliers_threshold <- Q3 + 1.5 * (Q3 - median)
+outliers_threshold 
+
+# create boxplot of scores 
+news %>% 
+  ggplot(aes(y = change_0413,x = NA,fill = 'red'))+
+  geom_boxplot()+
+  guides(fill = FALSE)+
+  labs(x = "Boxplot",y = "Change_0413")+
+  ggtitle("Boxplot of change_0413")+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+Shape: bimodal and almost symmetric.
+Location: the median is -32.000 (see summary and box plot).
+Spread: the first quantile is -41.000 and the third quantile is -20.000, the interquartile range can be directly shown in the box plot.
+Outliers: There are 4 outliers above the outlier_threshold as shown in the boxplot
+## (c) Do either of change_0413 and the variable representing average circulation have a skew that could be resolved by a log transform? For each variable, select whether it should be transformed  
+```{r}
+news %>% 
+  ggplot(aes(log(circ_aver)))+
+  geom_histogram(col ="black",fill = "orange")+
+  ggtitle("Histogram of log(circ_aver)")+
+  labs(x = "log(circ_aver)", y = "Frequency of the range of log(circ_aver)")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+Average circulation have a right skewed shape, so it's necessary to use log transform. After transform, the shape of average circulation has a more symmetrical shape compared to the previous one.
+
+# Question Three: Model building and interpretation
+## (a) Build a model predicting the variable representing a newspaper’s circulation using prizes_9014, incorporating a log transform for the average circulation if you decided this was necessary. State and interpret the slope and intercept of this model in context. Is there a statistically significant relationship between the number of Pulitzer Prizes, and average circulation?
+```{r}
+news %>% 
+  ggplot(aes(prizes_9014,circ_aver))+
+  geom_point()
+
+news %>% 
+  ggplot(aes(log(prizes_9014),log(circ_aver)))+
+  geom_point()
+
+lm_cir <- lm(log(circ_aver)~log(prizes_9014),data=news)
+lm_cir1 <- lm((circ_aver)~(prizes_9014),data=news)
+summary(lm_cir)
+summary(lm_cir1)
+```
+From summary, we can see the P-value of Intercept of log(prizes_9014) ~ log(circ_aver) is far less than that of prizes_9014 ~ circ_aver, so I decide to use log transform to predict. 
+
+In the model, the slope is 0.239 and intercept is 12.248, so the model will be interpreted as $\log{y}=12.248+0.239\log{x}$. 
+
+there is a statistically significant relationship between this two variables, because both P-values are less the the experience value saying 0.05.
+## (b) Build a model predicting change_0413 using prizes_9014, incorporating a log transform for change_0413 if you decided this was necessary. Is there a statistically significant relationship between the number of Pulitzer Prizes, and change in circulation?
+```{r}
+news %>% 
+  ggplot(aes(log(change_0413+102)))+
+  geom_histogram(col ="black",fill = "orange")+
+  ggtitle("Histogram of log(change_0413+102)")+
+  labs(x = "log(change_0413+102)", y = "Frequency of the range of log(change_0413+102)")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+news %>% 
+  ggplot(aes((change_0413)))+
+  geom_histogram(col ="black",fill = "orange")+
+  ggtitle("Histogram of log(change_0413+102)")+
+  labs(x = "log(change_0413+102)", y = "Frequency of the range of log(change_0413+102)")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+news %>% 
+  ggplot(aes(prizes_9014,change_0413))+
+  geom_point()
+
+news %>% 
+  ggplot(aes(log(prizes_9014),log(change_0413+102)))+
+  geom_point()
+
+# bc <- BoxCoxTrans(y = news$change_0413,x = news$prizes_9014)
+# news <- mutate(news, TransformedChange = predict(bc,news$change_0413))
+# news %>% 
+#   ggplot(aes(prizes_9014,TransformedChange)) + 
+#   geom_point() + 
+#   geom_smooth()
+
+lm_change <- lm(log(change_0413+102)~log(prizes_9014),data=news)
+lm_change1 <- lm(change_0413~prizes_9014,data=news)
+summary(lm_change)
+summary(lm_change1)
+```
+I decide to use log(change_0413 + 102) ~ log(prizes_9014) relationship to build model
+
+In the model, the slope is 0.068 and intercept is 3.990, so the model will be interpreted as $\log{(y+102)}=3.990+0.068\log{x}$. 
+
+there isn't a statistically significant relationship between this two variables, because the P-values of slope is greater than the experience value saying 0.05.
+## (c) Check the assumptions of the linear models. Recall that there are four assumptions for each model.
+1. Linearity
+```{r}
+plot(lm_cir,which = 1)
+plot(lm_change,which = 1)
+```
+ The error terms are roughly straight
+ 
+ 2. Homoscedasticity  
+```{r}
+plot(lm_cir,which = 3)
+plot(lm_change1,which = 3)
+```
+ 3. Normality and Independence
+```{r}
+plot(lm_cir,which = 2)
+plot(lm_change,which = 2)
+```
+# Question Four: Prediction
+## (a) Using the model from Question 3(a), calculate the expected circulation of the newspaper under each of the three proposed strategic directions and represent these in a table. How does this compare with the current circulation?
+```{r}
+#news %>% filter(newspaper == "Chicago Sun-Times" ) %>% pull(prizes_9014)
+sun_time <-  news %>% filter(newspaper == "Chicago Sun-Times" ) 
+sun_prizes <- sun_time$prizes_9014
+new_data <- tibble(
+ prizes_9014 = c(3,25,50)+sun_prizes
+)
+predict_cacul <- exp(predict(lm_cir, new_data))
+predict_cacul
+```
+The current circulation is 470548. Investing substantially less than current will cause the decreasing of circulation, vice versa.
+## (b) Using the model from Question 3(b), calculate the change in circulation of the newspaper, across the next decade, under each of the three proposed strategic directions and represent these in a table. Comment on whether the projections of each of the two models are consistent.
+```{r}
+#the projections of change_0413~prizes_9014 model 
+exp(predict(lm_change, new_data))-102
+
+#the projections of log(circ_aver)~log(prizes_9014) model 
+(predict_cacul/470548-1)*100
+
+```
+The projection of the two models aren't consistent with the three strategies.
+## (c) Using the model from Question 3(a), calculate 90% confidence intervals for the expected circulation of the newspaper under each of the three proposed strategic directions. Place these confidence intervals in a table, and contrast them in context.
+
+```{r}
+confidence_inter <-as_tibble(exp(predict(lm_cir,new_data,interval = "confidence", level = 0.9)))
+confidence_inter %>% 
+  mutate(interval = upr-lwr)
+
+```
+From the table, we can see the size of confidence interval increases with the promotion of the expected circulation.
+## (d) Using the model from Question 3(b), calculate 90% prediction intervals for the expected change in circulation of the newspaper under each of the three proposed strategic directions. Place these prediction intervals in a table, and contrast them in context.
+```{r}
+confidence_inter1 <-as_tibble(exp(predict(lm_change,new_data,interval = "confidence", level = 0.9))-102)
+confidence_inter1 %>% 
+  mutate(interval = upr-lwr)
+```
+
+# Question Five: Limitations
+## (a) Discuss what limitations there might be to each of the models. Why might this model be insufficient for its application? You should discuss at least two limitations of these models in application
+2. change_0413 ~ prizes_9014 linear model
++ At the beginning, we assumes that the relationship between change_0413 and prizes_9014 prizes_9014 is linear. However, in this cases, the relationship may be non-linear. Especially, in the range of  leading to poor fit and inaccurate predictions
+
+
+

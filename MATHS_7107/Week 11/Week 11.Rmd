@@ -1,0 +1,115 @@
+---
+title: "week11"
+author: "Chang Dong"
+date: "2023-04-13"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+pacman::p_load(tidymodels, tidyverse,titanic,ggplot2,discrim)
+```
+# Linear Discriminant Analysis (LDA)
+
+You are going to fit LDA on the Titanic dataset to see how it compares to the logistic regression you fit in Week 8: Example — Titanic and Yardstick. We used the following code:
+
+```{r}
+library( titanic ) 
+titanic <- as_tibble( titanic::titanic_train ) 
+titanic <- titanic %>% mutate(Survived = factor( Survived ), 
+                              Pclass = factor( Pclass ), 
+                              Sex = factor( Sex )) %>% 
+  dplyr::select(Survived, Pclass, Age, Sex) %>% 
+drop_na()
+```
+
+What you need to do:
+
+1. Fit LDA on the Titanic dataset using TidyModels. Remember, you are looking to classify whether people survived based on their age, sex, and class.
+
+```{r}
+titanic_lda <- discrim_linear( mode = "classification" ) %>% 
+  set_engine( "MASS" ) %>% 
+  fit( Survived ~ Age + Sex + Pclass, data = titanic ) 
+titanic_lda
+```
+
+2. Obtain class predictions for the titanic dataset.
+
+```{r}
+titanic_preds <- predict( titanic_lda, new_data = titanic ) %>% 
+  bind_cols( titanic %>% 
+dplyr::select( Survived ) )
+```
+
+3. Get the confusion matrix for this model.
+```{r}
+titanic_preds %>% 
+  conf_mat( Survived, .pred_class )
+```
+
+4. What is the sensitivity of this model? What is the specificity?
+```{r}
+tibble( Sensitivity = 361 / (361 + 63), 
+        Specificity = 204 / (204 + 86) )
+```
+
+5. Obtain probability predictions for this model.
+```{r}
+titanic_preds <- titanic_preds %>% 
+  bind_cols(predict( titanic_lda, 
+                     new_data = titanic,
+                     type = "prob" )
+) 
+titanic_preds
+```
+
+6. Plot the ROC curve for this model.
+```{r}
+titanic_preds %>% roc_curve( truth = Survived,
+                             estimate = .pred_0 ) %>% 
+  autoplot()
+```
+
+7. Obtain the AUC for this ROC curve.
+```{r}
+titanic_preds %>% 
+  roc_auc(truth = Survived, estimate = .pred_0)
+```
+
+8. Based on this value, would you prefer the logistic regression model or the LDA model to model this data?
+
+#### The AUC for logistic regression is 0.852 > 0.850, so you would only just prefer the logistic regression. It is also much easier to interpret logistic regression, so this makes it even more preferred.
+
+9. Create a 10-fold cross-validation set for this data (strata by Survived).
+```{r}
+titanic_cv <- vfold_cv( titanic, v = 10, strata = Survived ) 
+titanic_cv
+```
+
+10. Using the cross-validation sets, do the following:
+
+a. Create a model specification for LDA.
+
+b. Fit LDA on the cross-validation sets.
+
+c. Obtain the estimates of the AUC and accuracy, as well as their standard errors.
+```{r}
+# a) 
+lda_spec <- discrim_linear( mode = "classification" ) %>% 
+  set_engine( "MASS" )
+
+# b) 
+titanic_lda_resamples <- fit_resamples(
+  object = lda_spec, preprocessor = recipe(Survived ~ . , data = titanic), 
+  resamples = titanic_cv) 
+
+# c) 
+titanic_lda_resamples %>% 
+  collect_metrics()
+```

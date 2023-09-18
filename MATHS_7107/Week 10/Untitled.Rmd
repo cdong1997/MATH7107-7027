@@ -1,0 +1,151 @@
+---
+title: "Week 10"
+author: "Chang Dong"
+date: "2023-04-07"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ISLR)
+library(tidymodels)
+library(rpart) 
+library(rpart.plot)
+as_tibble(Carseats)
+```
+
+```{r}
+Carseats <- Carseats %>% mutate("Sales_high" = ifelse(Sales > 8, "Yes", "No"))
+```
+
+```{r}
+Carseats$Sales_high <- factor(Carseats$Sales_high)
+```
+
+```{r}
+Carseats <- Carseats %>% select(-Sales)
+```
+
+
+```{r}
+set.seed(2022) 
+car_split <- initial_split( Carseats ) 
+car_train <- training( car_split ) 
+car_test <- testing( car_split ) 
+car_cv <- vfold_cv( car_train, v = 5 )
+```
+  
+```{r}
+car_tree_spec <- decision_tree( mode = "classification" ) %>% set_engine( "rpart" )
+```
+
+```{r}
+car_tree <- car_tree_spec %>% fit( Sales_high ~ . , data = car_train) 
+plot( car_tree$fit ) 
+text( car_tree$fit )
+```
+
+```{r}
+library(vip) 
+car_tree %>% vip()
+```
+
+```{r}
+car_tree_tune <- decision_tree(mode = "classification", cost_complexity = tune()) %>% set_engine("rpart")
+```
+
+```{r}
+cost_grid <- grid_regular( cost_complexity(), levels = 20 ) 
+cost_grid
+```
+```{r}
+doParallel::registerDoParallel()
+tree_tune <- tune_grid(object = car_tree_tune,
+
+preprocessor = recipe(Sales_high ~ ., data = car_train), resamples = car_cv, grid = cost_grid)
+```
+
+```{r}
+collect_metrics(tree_tune)
+```
+
+```{r}
+collect_metrics(tree_tune) %>% filter(mean==max(mean))
+```
+
+
+```{r}
+select_best( tree_tune, "roc_auc")
+```
+
+```{r}
+best_auc <- select_best( tree_tune, "roc_auc")
+final_spec <- finalize_model( car_tree_tune, best_auc ) 
+final_tree <- final_spec %>% fit( Sales_high ~ . , data = car_train )
+
+plot( final_tree$fit ) 
+text( final_tree$fit )
+```
+
+```{r}
+final_tree %>% vip()
+```
+
+```{r}
+car_train_preds <- car_tree %>%
+
+predict( new_data = car_test,type = "class") %>% bind_cols( car_test )
+
+car_train_preds %>% metrics( truth = Sales_high, estimate = .pred_class)
+```
+
+```{r}
+car_preds <- predict( final_tree, # Get probability predict 
+                      new_data = car_test,
+
+type = "prob" ) %>%
+
+bind_cols( car_test %>% # Add on the truth.
+  select( Sales_high ) %>% 
+    mutate( model = "Tuned" ) ) %>% # Add a vari 
+bind_rows( # Bind on the predictions from the orginal tre 
+  predict( car_tree, # Get probability predictions 
+           new_data = car_test,
+            type = "prob" ) %>%
+
+  bind_cols( car_test %>% # Add truth and model tacker 
+               select( Sales_high ) %>%
+
+    mutate( model = "Untuned" ) )
+
+) 
+car_preds %>% group_by( model ) %>% # Seperate by model type. 
+  roc_curve( truth = Sales_high, estimate = .pred_No ) %>% autoplot
+```
+
+
+```{r}
+Gini_left=0.30*0.70 + 0.70*0.30
+
+Gini_left
+
+```
+
+```{r}
+Gini_right=0.74*0.26 + 0.26*0.74
+
+Gini_right
+```
+
+
+```{r}
+Weighted_gini=0.78*Gini_left+0.22*Gini_right 
+Weighted_gini
+```
+
+

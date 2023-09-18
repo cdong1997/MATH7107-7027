@@ -1,0 +1,126 @@
+---
+title: "MATHS 7107 Data Taming Tutorial Week 8"
+author: "Chang Dong"
+date: "2023-03-20"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Load the libraries.
+```{r}
+pacman::p_load("tidymodels","tidyverse","stringr")
+```
+
+## 2. Read the data.
+```{r}
+origin_runs <-read.csv("test_runs_original.csv")
+runs <- read.csv("test_runs.csv")
+```
+
+## 3. Extract the country code from the player variable and create a new variable called Country. hint: You can use “\\((.+?)\\)” regular expression.
+
+```{r}
+origin_runs <-origin_runs %>% mutate(Country = str_match(origin_runs$Player,pattern = "\\((.+?)\\)")[,2]) 
+origin_runs %>% head()
+```
+
+## 4.Remove the country code from the players name.
+```{r}
+origin_runs$Player = str_replace(origin_runs$Player,pattern = "\\s*\\((.+?)\\)", "")
+origin_runs %>% head()
+```
+
+## 5.Extract only the number from the HS (Highest score) variable?
+```{r}
+origin_runs$HS = str_remove(origin_runs$HS,pattern = "\\*")
+origin_runs %>% head()
+```
+
+## 6. Change variable names as follow
+
+100 as Centuries
+50 as Fifties 
+0 as Zeros
+```{r}
+origin_runs<- origin_runs %>% rename(Centuries =  X100,
+                                     Fifties = X50,
+                                     Zeros = X0)
+origin_runs %>% head()
+```
+
+## 7. Recode the relevant variables as factors and integers
+```{r}
+origin_runs$HS <- as.numeric(origin_runs$HS)
+origin_runs$Country <- as.factor((origin_runs$Country))
+```
+
+## 8. Recode the factors using fct_recode() such that there are no typographical errors in the Country variable.
+```{r}
+levels(origin_runs$Country) <- fct_recode(levels(origin_runs$Country),
+"INDIA" = "ICC/INDIA", "PAK" = "ICC/PAK", "SA" = "ICC/SA","WI" ="ICC/WI")
+```
+
+## 9. Create a new variable for the number of years the player has played cricket.
+```{r}
+years = c()
+for (year in str_match_all(origin_runs$Span,pattern = "\\d+")) {
+years = c(years, as.numeric(year[2,])-as.numeric(year[1,]))
+}
+origin_runs$Years = years
+origin_runs %>% head()
+```
+
+## 10. Save the dataset
+```{r}
+write.csv(origin_runs, "runs.csv",row.names = FALSE )
+```
+
+## 11.Who scored highest test score? and from which country?
+```{r}
+origin_runs[origin_runs$HS %>% which.max(),]$Player
+origin_runs[origin_runs$HS %>% which.max(),]$Country
+```
+
+## 12.Compare the batting averages from each country
+```{r}
+origin_runs %>% group_by(Country) %>% 
+  ggplot(aes(y = Ave, x = Country,fill = Country)) + geom_boxplot()
+```
+
+## 13. Create a bar graph for the proportion of centuries from each country?
+```{r}
+#origin_runs %>% group_by(Country) %>% 
+#  ggplot(aes(y = Centuries, x = Country)) + geom_bar()
+```
+
+14. Build up a model to predict the average score by using the following predicters.
+
+ Mat, NO, HS, Centuries, Fifties, Zeros, Country, Years
+```{r}
+origin_runs
+lm <-lm( Ave ~ Mat + NO + HS + Centuries + Fifties + Zeros + Country + Years, data = origin_runs)
+summary(lm)
+```
+
+## 15. Check the assumptions
+
+Reject the alternative assumption, they have linear relationships because p value is small. But we can only trust that "Mat","NO","Centuries" and "Years" have statistical significant.
+
+## 16. Predict the batting average of a player with the following statistics?
+```{r}
+predict_data <- data.frame(
+  Mat = 85, NO = 17, HS = mean(origin_runs$HS), 
+  Centuries = 27, Fifties = 36, Zeros = mean(origin_runs$Zeros),
+  Country = "AUS",
+  Years = 12
+)
+predict(lm, newdata = predict_data)
+```
+
+## 17. Can we use this model to predict the batting average of any player?
+No, this model is not credible.

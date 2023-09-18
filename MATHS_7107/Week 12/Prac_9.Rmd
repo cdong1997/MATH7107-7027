@@ -1,0 +1,102 @@
+---
+title: "prac_9"
+author: "Chang Dong"
+date: "2023-04-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+```{r}
+pacman::p_load( glmx )
+data( "BeetleMortality" )
+as_tibble( BeetleMortality)
+```
+
+
+```{r}
+BeetleMortality <- BeetleMortality %>%
+   mutate( prop_died = died/n )
+
+ggplot( BeetleMortality , aes( x = dose, y = prop_died ) ) +
+   geom_point() +
+   geom_smooth( se = FALSE ) #We want to fit a line to the data, but not include any error bounds
+```
+
+```{r}
+library( skimr )
+library( titanic )
+titanic <- as_tibble( titanic::titanic_train )
+titanic <- titanic %>%
+   mutate( Survived = factor( Survived ),
+                Pclass = factor( Pclass ),
+                Sex = factor( Sex ) #This ensures some variable of interest are correctly read in as factors
+   ) 
+
+skim_without_charts( titanic )
+```
+
+```{r}
+titanic.glm <- glm( Survived ~ Age + Sex, family = binomial(), data = titanic )
+summary( titanic.glm )
+titanic.glm
+```
+
+```{r}
+data( "Hitters", package = "ISLR" )
+Hitters <- Hitters %>% 
+  tibble() %>% 
+  drop_na()
+skim( Hitters )
+```
+
+```{r}
+set.seed( 1223 ) # Don't want to forget our seed
+hitters_split <- initial_split( Hitters ) # Create our split object
+hitters_train <- training( hitters_split ) # Get our testing and training sets
+hitters_test <- testing( hitters_split )
+```
+
+```{r}
+reg_tree_spec <- decision_tree( mode = "regression" ) %>% 
+  set_engine( "rpart" ) # This is the default engine, which we will use.
+```
+
+```{r}
+hitters_tree <- reg_tree_spec %>% 
+  fit( Salary ~ . , data = hitters_train )
+```
+
+```{r}
+plot( hitters_tree$fit )
+text( hitters_tree$fit, pretty = 0 )
+```
+
+```{r}
+hitters_tree %>% 
+  vi()
+```
+
+```{r}
+hitters_train_preds <- hitters_tree %>% 
+  predict( new_data = hitters_train ) %>% 
+  bind_cols( hitters_train ) 
+hitters_train_preds
+```
+
+```{r}
+hitters_train_preds %>% 
+  metrics( truth = Salary, estimate = .pred)
+
+```
+
+```{r}
+hitters_test_preds <- hitters_tree %>% 
+  predict( new_data = hitters_test ) %>% 
+  bind_cols( hitters_test ) 
+hitters_test_preds%>% 
+  metrics( truth = Salary, estimate = .pred)
+```
